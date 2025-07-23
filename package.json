@@ -1,0 +1,36 @@
+{
+  "name": "token_contract",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "yarn clean && tsc -b",
+    "build:dev": "tsc -b --watch",
+    "codegen": "aztec codegen target --outdir src/artifacts",
+    "compile": "${AZTEC_NARGO:-aztec-nargo} compile",
+    "deploy": "tsx scripts/deploy_contract.ts",
+    "deploy-account": "tsx scripts/deploy_account.ts",
+    "clean": "rm -rf ./dest tsconfig.tsbuildinfo",
+    "start": "yarn build && DEBUG='token' node ./dest/index.js",
+    "test": "rm -rf store/pxe && NODE_NO_WARNINGS=1 node --experimental-vm-modules $(yarn bin jest) --no-cache --runInBand --config jest.integration.config.json"
+  },
+  "dependencies": {
+    "@aztec/accounts": "v1.1.3",
+    "@aztec/aztec.js": "v1.1.3",
+    "@aztec/builder": "v1.1.3",
+    "@aztec/kv-store": "^1.1.3",
+    "@aztec/noir-contracts.js": "v1.1.3",
+    "@aztec/pxe": "^1.1.3",
+    "@types/jest": "^29.5.12",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20.14.10",
+    "ts-jest": "^29.1.4",
+    "typescript": "^5.5.3"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "tsx": "^4.20.3"
+  }
+}

@@ -1,0 +1,11 @@
+[package]
+name = "token_contract"
+type = "contract"
+authors = [ "" ]
+compiler_version = ">=0.18.0"
+
+[dependencies]
+aztec = { git = "https://github.com/AztecProtocol/aztec-packages/", tag = "v1.1.3", directory = "noir-projects/aztec-nr/aztec" }
+compressed_string = { git = "https://github.com/AztecProtocol/aztec-packages/", tag = "v1.1.3", directory = "noir-projects/aztec-nr/compressed-string" }
+value_note = { git = "https://github.com/AztecProtocol/aztec-packages/", tag = "v1.1.3", directory = "noir-projects/aztec-nr/value-note" }
+uint_note = { git = "https://github.com/AztecProtocol/aztec-packages/", tag = "v1.1.3", directory = "noir-projects/aztec-nr/uint-note" }
