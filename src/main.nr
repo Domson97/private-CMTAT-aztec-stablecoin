@@ -9,22 +9,25 @@ contract FiatCMTAToken {
     use dep::compressed_string::FieldCompressedString;
     use std::{meta::derive, ops::{Add, Sub}};
 
-    use dep::authwit::auth::{
+    // Update authwit import path
+    use dep::aztec::authwit::auth::{
         assert_current_call_valid_authwit,
         compute_authwit_nullifier,
     };
     use dep::aztec::{
         context::{PrivateCallInterface, PrivateContext},
-        event::event_interface::EventInterface,
+        event::event_interface::{emit_event_in_private_log, PrivateLogContent},
         macros::{
             events::event,
-            functions::{initializer, internal, private, public, view},
+            functions::{initializer, internal, private, public, view, utility},
             storage::storage,
         },
+        messages::logs::note::{encode_and_encrypt_note, encode_and_encrypt_note_unconstrained},
         prelude::{
             AztecAddress, Map,PrivateSet, PublicMutable, PublicImmutable,
             SharedMutable, PublicContext,
         },
+        protocol_types::traits::{Hash, ToField, Serialize},
     };
 
     use crate::types::{
@@ -37,16 +40,19 @@ contract FiatCMTAToken {
 
     use dep::value_note::{balance_utils, value_note::ValueNote};
 
-        use dep::aztec::{
+    use dep::aztec::{
         keys::getters::get_public_keys,
-        macros::{functions::{ utility}},
     };
-    use dep::aztec::protocol_types::traits::{Hash, ToField};
 
-    
+    #[event]
+    struct Transfer {
+        from: AztecAddress,
+        to: AztecAddress,
+        amount: Field,
+    }
 
-    // Changing an address' roles has a certain block delay before it goes into effect.
-    global CHANGE_ROLES_DELAY_BLOCKS: u32 = 2;
+    // Change from blocks to seconds - updated timing for role changes
+    global CHANGE_ROLES_DELAY_SECONDS: u64 = 20; // Convert 2 blocks to appropriate seconds
     //This global is used when doing batching. We set a limit of 1 address per call for now due to the 4 encrypted logs limit.
     global MAX_ADDR_PER_CALL: u32 = 1;
 
@@ -59,7 +65,8 @@ contract FiatCMTAToken {
         enforcement_module: Freezable<FreezableFlag, Context>,
         access_control: AccessControlModule<bool, Context>,
 
-        issuer_address: SharedMutable<AztecAddress, CHANGE_ROLES_DELAY_BLOCKS, Context>,
+        // Update to use seconds instead of blocks
+        issuer_address: SharedMutable<AztecAddress, CHANGE_ROLES_DELAY_SECONDS, Context>,
 
         balances: Map<AztecAddress, PrivateSet<ValueNote, Context>, Context>,
         total_supply: PublicMutable<Field, Context>,
@@ -97,7 +104,7 @@ contract FiatCMTAToken {
 
     #[public]
     #[view]
-    fn has_role(role: Field, account: AztecAddress) -> pub Field {
+    fn has_role(role: Field, account: AztecAddress) -> Field {
         storage.access_control.has_role(role, account).to_field()
     }
 
@@ -129,7 +136,7 @@ contract FiatCMTAToken {
 
     #[public]
     #[view]
-    fn get_operations() -> pub Field {
+    fn get_operations() -> Field {
         storage.validation_module.get_operations()
     }
 
@@ -166,7 +173,7 @@ contract FiatCMTAToken {
 
     #[public]
     #[view]
-    fn public_get_pause() -> pub Field {
+    fn public_get_pause() -> Field {
         storage.pause_module.is_paused().to_field()
     }
 
@@ -190,7 +197,7 @@ contract FiatCMTAToken {
 
     #[public]
     #[view]
-    fn get_frozen(user: AztecAddress) -> pub Field {
+    fn get_frozen(user: AztecAddress) -> Field {
         storage.enforcement_module.is_frozen(user).to_field()
     }
 
@@ -213,37 +220,37 @@ contract FiatCMTAToken {
 
     #[public]
     #[view]
-    fn public_get_name() -> pub FieldCompressedString {
+    fn public_get_name() -> FieldCompressedString {
         storage.tokenName.read()
     }
 
     #[private]
     #[view]
-    fn private_get_name() -> pub FieldCompressedString {
+    fn private_get_name() -> FieldCompressedString {
         storage.tokenName.read()
     }
 
     #[public]
     #[view]
-    fn public_get_symbol() -> pub FieldCompressedString {
+    fn public_get_symbol() -> FieldCompressedString {
         storage.symbol.read()
     }
 
     #[private]
     #[view]
-    fn private_get_symbol() -> pub FieldCompressedString {
+    fn private_get_symbol() -> FieldCompressedString {
         storage.symbol.read()
     }
 
     #[public]
     #[view]
-    fn public_get_decimals() -> pub u8 {
+    fn public_get_decimals() -> u8 {
         storage.decimals.read()
     }
 
     #[private]
     #[view]
-    fn private_get_decimals() -> pub u8 {
+    fn private_get_decimals() -> u8 {
         storage.decimals.read()
     }
 
@@ -255,25 +262,25 @@ contract FiatCMTAToken {
     //TODO: we should be able to change the address of the issuer and put some ACL on it
     #[public]
     #[view]
-    fn public_get_issuer() -> pub AztecAddress {
+    fn public_get_issuer() -> AztecAddress {
         storage.issuer_address.get_current_value()
     }
 
     #[private]
     #[view]
-    fn private_get_issuer() -> pub AztecAddress {
+    fn private_get_issuer() -> AztecAddress {
         storage.issuer_address.get_current_value()
     }
 
     #[public]
     #[view]
-    fn public_get_currency() -> pub FieldCompressedString {
+    fn public_get_currency() -> FieldCompressedString {
         storage.tokenCurrency.read()
     }
     
     #[private]
     #[view]
-    fn private_get_currency() -> pub FieldCompressedString {
+    fn private_get_currency() -> FieldCompressedString {
         storage.tokenCurrency.read()
     }
 
@@ -344,9 +351,15 @@ contract FiatCMTAToken {
         let from = context.msg_sender();
         FiatCMTAToken::at(context.this_address())._transfer_internal(from, to, amount).call(&mut context);
         FiatCMTAToken::at(context.this_address())._transfer().enqueue(&mut context);
-        // Transfer { from, to, amount: amount.to_field() }.emit(
-        //     encode_and_encrypt_event_unconstrained(&mut context, from, to),
-        // );
+        
+        // Updated event emission using the new API
+        emit_event_in_private_log(
+            Transfer { from, to, amount },
+            &mut context,
+            from,
+            to,
+            PrivateLogContent.NO_CONSTRAINTS,
+        );
     }
 
     /*
@@ -388,9 +401,15 @@ contract FiatCMTAToken {
         }
         FiatCMTAToken::at(context.this_address())._transfer_internal(from, to, amount).call(&mut context);
         FiatCMTAToken::at(context.this_address())._transferFrom().enqueue(&mut context);
-        // Transfer { from, to, amount: amount.to_field() }.emit(
-        //     encode_and_encrypt_event_unconstrained(&mut context, from, to),
-        // );
+        
+        // Updated event emission using the new API
+        emit_event_in_private_log(
+            Transfer { from, to, amount },
+            &mut context,
+            from,
+            to,
+            PrivateLogContent.NO_CONSTRAINTS,
+        );
     }
 
     /**
@@ -477,11 +496,10 @@ contract FiatCMTAToken {
         storage.total_supply.write(new_supply);
     }
 
-
     // //############ UNCONSTRAINED ############
 
     #[utility]
-    pub(crate) unconstrained fn balance_of_private(owner: AztecAddress) -> pub Field {
+    pub(crate) unconstrained fn balance_of_private(owner: AztecAddress) -> Field {
         let balance_set = storage.balances.at(owner);
         balance_utils::get_balance(balance_set)
     }

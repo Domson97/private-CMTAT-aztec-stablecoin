@@ -1,13 +1,14 @@
 use dep::aztec::{prelude::{AztecAddress, SharedMutable, Map},  context::PublicContext, context::PrivateContext, state_vars::storage::Storage};
-use dep::aztec::protocol_types::traits::{Packable, Serialize, Deserialize, ToField};
+use dep::aztec::protocol_types::traits::{Packable, Serialize, Deserialize};
 use crate::types::access_controlModule::{AccessControlModule,ENFORCEMENT_ROLE};
 
 global FREEZED_FLAG: u64 = 1;
-global CHANGE_ROLES_DELAY_BLOCKS: u32 = 2;
+// Migration note: Changed from blocks to seconds (timestamps)
+global CHANGE_ROLES_DELAY_SECONDS: u64 = 20; // Convert 2 blocks to appropriate seconds
 
 #[derive(Deserialize, Packable, Eq, Serialize)]
 pub struct FreezableFlag {
-    is_freezed: bool,
+    pub is_freezed: bool,
 }
 
 trait FreezableFlagTrait {
@@ -15,9 +16,11 @@ trait FreezableFlagTrait {
 }
 
 pub struct Freezable<T,Context>{
-    pub map: Map<AztecAddress, SharedMutable<T, CHANGE_ROLES_DELAY_BLOCKS, Context>, Context>
+    // Migration note: SharedMutable now uses seconds-based timing with u64
+    pub map: Map<AztecAddress, SharedMutable<T, CHANGE_ROLES_DELAY_SECONDS, Context>, Context>
 }
 
+// TODO(#13824): remove this impl once we allow structs to hold state variables.
 impl<T,Context> Storage<1> for Freezable<T,Context> {
         fn get_storage_slot(self) -> Field {
             self.map.get_storage_slot()
@@ -33,7 +36,7 @@ impl<T,Context> Freezable<T,Context> where T: Eq  + FreezableFlagTrait + Packabl
             map: Map::new(
                 context,
                 storage_slot,
-                |context, slot| SharedMutable::new(context,slot)
+                |context, slot| SharedMutable::<T, CHANGE_ROLES_DELAY_SECONDS, Context>::new(context, slot)
             )
         }
     }

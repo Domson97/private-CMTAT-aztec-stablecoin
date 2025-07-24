@@ -8,7 +8,8 @@ pub global BLACKLIST_FLAG: u64 = 1;
 pub global WHITELIST_FLAG: u64 = 2;
 pub global SANCTIONLIST_FLAG: u64 = 4;
 
-pub global CHANGE_ROLES_DELAY_BLOCKS: u32 = 2;
+// Migration note: Changed from blocks to seconds (timestamps)
+pub global CHANGE_ROLES_DELAY_SECONDS: u64 = 20; // Convert 2 blocks to appropriate seconds
 
 global TEXT_ADDRESS_FROM_IS_BLACKLISTED: str<30> = "The sender is in the blacklist";
 global TEXT_ADDRESS_TO_IS_BLACKLISTED: str<33> = "The recipient is in the blacklist";
@@ -16,17 +17,17 @@ global TEXT_ADDRESS_FROM_NOT_WHITELISTED: str<34> = "The sender is not in the wh
 global TEXT_ADDRESS_TO_NOT_WHITELISTED: str<37> = "The recipient is not in the whitelist";
 
 #[derive(Deserialize, Packable, Eq, Serialize)]
-
 pub struct SetFlag {
-    operate_blacklist: bool,
-    operate_whitelist: bool,
-    operate_sanctionlist: bool,
+    pub operate_blacklist: bool,
+    pub operate_whitelist: bool,
+    pub operate_sanctionlist: bool,
 }
+
 #[derive(Deserialize, Eq, Serialize)]
 pub struct UserFlags {
-    is_blacklisted: bool,
-    is_whitelisted: bool,
-    is_in_sanction_list: bool,
+    pub is_blacklisted: bool,
+    pub is_whitelisted: bool,
+    pub is_in_sanction_list: bool,
 }
 
 trait UserFlagsTrait {
@@ -36,10 +37,12 @@ trait UserFlagsTrait {
 }
 
 pub struct ValidationModule<T,Context> {
-    pub map: Map<AztecAddress, SharedMutable<T,CHANGE_ROLES_DELAY_BLOCKS ,Context>, Context>,
-    pub operationsFlag: SharedMutable<SetFlag,CHANGE_ROLES_DELAY_BLOCKS, Context>
+    // Migration note: SharedMutable now uses seconds-based timing with u64
+    pub map: Map<AztecAddress, SharedMutable<T, CHANGE_ROLES_DELAY_SECONDS, Context>, Context>,
+    pub operationsFlag: SharedMutable<SetFlag, CHANGE_ROLES_DELAY_SECONDS, Context>
 }
 
+// TODO(#13824): remove this impl once we allow structs to hold state variables.
 impl<T,Context> Storage<9> for ValidationModule<T,Context> {
         fn get_storage_slot(self) -> Field {
         // this returns the *first* slot; the framework will then reserve
@@ -57,9 +60,9 @@ impl<T,Context> ValidationModule<T,Context> where T: Eq + ToField + FromField + 
             map: Map::new(
                 context,
                 map_slot,
-                |context, slot| SharedMutable::new(context, slot)
+                |context, slot| SharedMutable::<T, CHANGE_ROLES_DELAY_SECONDS, Context>::new(context, slot)
             ),
-            operationsFlag: SharedMutable::new(context, ops_slot)
+            operationsFlag: SharedMutable::<SetFlag, CHANGE_ROLES_DELAY_SECONDS, Context>::new(context, ops_slot)
         }
     }
 }
@@ -113,7 +116,7 @@ impl<T> ValidationModule<T,&mut PrivateContext> where T: Eq + ToField + FromFiel
         assert(self.map.at(to).get_current_value().get_is_whitelisted(), TEXT_ADDRESS_TO_NOT_WHITELISTED);
     }
 
-    fn detectTransferRestriction_sanctionlist(self: Self, from: AztecAddress, to:AztecAddress){
+    fn detectTransferRestriction_sanctionlist(self: Self, _from: AztecAddress, _to:AztecAddress){
         assert(false, "not implemented.");
     }
 }

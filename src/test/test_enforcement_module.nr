@@ -1,6 +1,6 @@
 use crate::test::utils;
 use dep::aztec::{test::helpers::cheatcodes};
-use dep::authwit::cheatcodes as authwit_cheatcodes;
+use dep::aztec::test::helpers::authwit::add_private_authwit_from_call_interface as authwit_cheatcodes;
 use crate::FiatCMTAToken as Token;
 use crate::types::enforcementModule::{FreezableFlag};
 use crate::types::access_controlModule::{DEFAULT_ADMIN_ROLE, ENFORCEMENT_ROLE};
