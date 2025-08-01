@@ -1,0 +1,13 @@
+[
+  {
+    "contractAddress": "0x0ddd5afdef97e3776a36187757f0408fd25ae93527c8b2f169a575ae0d58caf0",
+    "deployer": "0x06dbab2f22f3f166165e63265884ab09afde47ec0af6e6c25e12f9bb9a8136ce",
+    "constructor": {
+      "tokenName": "FiatCMTAToken",
+      "tokenSymbol": "FCMTAT",
+      "tokenCurrency": "USD",
+      "tokenDecimals": "18",
+      "admin": "0x06dbab2f22f3f166165e63265884ab09afde47ec0af6e6c25e12f9bb9a8136ce"
+    }
+  }
+]

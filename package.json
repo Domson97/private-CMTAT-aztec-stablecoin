@@ -11,6 +11,7 @@
     "codegen": "aztec codegen target --outdir src/artifacts",
     "compile": "${AZTEC_NARGO:-aztec-nargo} compile",
     "deploy": "tsx scripts/deploy_contract.ts",
+    "mint": "tsx scripts/mint.ts",
     "deploy-account": "tsx scripts/deploy_account.ts",
     "clean": "rm -rf ./dest tsconfig.tsbuildinfo",
     "start": "yarn build && DEBUG='token' node ./dest/index.js",
